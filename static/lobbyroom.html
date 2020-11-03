@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width" />
+
+
+    <link rel="stylesheet" href="styles.css">
+    <style>
+      body { font-family: Tahoma, Geneva, sans-serif; }
+    </style>
+
+    <!-- colyseus.js client -->
+    <script type="text/javascript" src="https://raw.githack.com/colyseus/colyseus.js/master/dist/colyseus.js"></script>
+
+    <script type="text/javascript">
+      document.onkeydown = function(e) {
+        if(event.keyCode == 123) {
+          console.log('You cannot inspect Element');
+          return false;
+        }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) {
+          console.log('You cannot inspect Element');
+          return false;
+        }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) {
+          console.log('You cannot inspect Element');
+          return false;
+        }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) {
+          console.log('You cannot inspect Element');
+          return false;
+        }
+        if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) {
+          console.log('You cannot inspect Element');
+          return false;
+        }
+      }
+      // prevents right clicking
+      document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+
+  </head>
+  <body>
+    <h1>
+      <a href="https://github.com/colyseus/colyseus-examples"><img src="https://cdn.jsdelivr.net/gh/colyseus/colyseus@master/media/header.png" height="100" alt="colyseus" /></a>
+    </h1>
+
+    <div class="divTable" style="width: 80%; border: 2px solid #000;" id="lobbyTable">
+      <div class="divTableBody" id="tableBody">
+        <div class="divTableRow">
+          <div class="divTableReadyCell">Ready</div>
+          <div class="divTableNameCell">Player</div>
+          <div class="divTableGroupCell">Group</div>
+          <div class="divTablePointCell">Points</div>
+        </div>
+      </div>
+    </div>
+
+    <p></p>
+    <p></p>
+
+    <button onclick="leave()">leave lobby</button>
+
+    <script>
+      var host = window.document.location.host.replace(/:.*/, '');
+      var row_id = "headingRow"
+
+      var client = new Colyseus.Client(location.protocol.replace("http", "ws") + "//" + host + (location.port ? ':' + location.port : ''));
+      var room;
+
+      var group_list = [];
+      client.joinOrCreate("lobby").then(room_instance => {
+        room = room_instance
+        var players = {};
+        var this_player;
+
+        room.onMessage("group_request", function(message) {
+          console.log(room.sessionId + " has requested to join group with " + message["Id"]);
+          if(confirm(message["Id"] + " has asked to join your group?") == true) {
+            room.send("group_confirm", {Id:message["Id"]});
+          } else {
+            room.send("group_decline");
+          }
+        })
+
+        room.onMessage("group_full", function() {
+          alert("Your group is full.");
+        })
+
+        room.state.players.onAdd = function (player, sessionId) {
+          var dom = document.createElement("div");
+          dom.className = "divTableRow";
+          dom.innerHTML = '<div class="divTableReadyCell"><button class=\
+            "readyButton" id=' + sessionId + '_readyButton onclick="box_check(this.id)"\
+             style="background-color:red;" disabled=true>\
+             Ready </button></div><div class="divTableNameCell">' + sessionId + '</div>\
+             <div class="divTableGroupCell" id=' + sessionId + '_group><span id=' + sessionId +
+              '_groupNumber></span><button class=\
+             "groupButton" id=' + sessionId + '_groupButton onclick="group_request(this.id)"\
+             disabled=true>+</button></div><div class="divTablePointCell" id=' + sessionId + '\
+             _points>&nbsp;</div>'
+          dom.id = sessionId;
+          players[sessionId] = dom;
+          document.getElementById("tableBody").appendChild(dom);
+          // set_buttons(room.state.players);
+        }
+
+        room.state.players.onRemove = function (player, sessionId) {
+          console.log("Removed player " + sessionId)
+          var element = document.getElementById(sessionId);
+          element.parentNode.removeChild(element);
+          delete players[sessionId];
+        }
+
+        room.state.players.onChange = function (player, sessionId) {
+          console.log(sessionId + ' has changed ready state');
+          set_buttons(room.state.players);
+        }
+      });
+
+      function box_check(buttonId) {
+        // var slice_pos = buttonId.lastIndexOf("_");
+        // var selectId = buttonId.slice(0,slice_pos);
+        room.send("check",{"Id": buttonId});
+      }
+
+      function set_buttons(players) {
+        console.log(room.sessionId);
+        if(players[ room.sessionId ].ready) {
+          set_ready(players);
+        } else {
+          ready_buttons = document.getElementsByClassName("readyButton");
+          group_buttons = document.getElementsByClassName("groupButton");
+          for (i = 0; i < ready_buttons.length; i++) {
+            var slice_pos = ready_buttons[i].id.lastIndexOf("_");
+            var selectId = ready_buttons[i].id.slice(0,slice_pos);
+            ready_buttons[i].disabled = true;
+            if (players[ selectId ].ready) {
+              ready_buttons[i].style.backgroundColor = "green";
+            } else {
+              ready_buttons[i].style.backgroundColor = "red";
+            }
+
+            if (players[ selectId ].group_willing && !(selectId in group_list)) {
+              group_buttons[i].disabled = false;
+              if (selectId == room.sessionId) {
+                group_buttons[i].innerText = "-";
+              }
+            } else {
+              group_buttons[i].disabled = true;
+              if (selectId == room.sessionId) {
+                group_buttons[i].innerText = "+";
+              }
+            }
+
+            if (players[ selectId ].group > -1) {
+              document.getElementById(selectId + "_groupNumber").textContent=players[ selectId ].group;
+            } else {
+              document.getElementById(selectId + "_groupNumber").textContent="";
+            }
+          }
+          document.getElementById(room.sessionId + "_readyButton").disabled = false;
+          document.getElementById(room.sessionId + "_groupButton").disabled = false;
+          document.getElementById(room.sessionId + "_readyButton").style.backgroundColor = "red";
+        }
+      }
+
+      function set_ready(players) {
+        ready_buttons = document.getElementsByClassName("readyButton");
+        group_buttons = document.getElementsByClassName("groupButton");
+        for (i = 0; i < ready_buttons.length; i++) {
+          var slice_pos = ready_buttons[i].id.lastIndexOf("_");
+          var selectId = ready_buttons[i].id.slice(0,slice_pos);
+          ready_buttons[i].disabled = true;
+          group_buttons[i].disabled = true;
+          if (players[ selectId ].ready) {
+            ready_buttons[i].style.backgroundColor = "green";
+          } else {
+            ready_buttons[i].style.backgroundColor = "red";
+          }
+          if (players[ selectId ].group > -1) {
+            document.getElementById(selectId + "_groupNumber").textContent=players[ selectId ].group;
+          } else {
+            document.getElementById(selectId + "_groupNumber").textContent="";
+          }
+        }
+        document.getElementById(room.sessionId + "_readyButton").disabled = false;
+        document.getElementById(room.sessionId + "_readyButton").style.backgroundColor = "green";
+      }
+
+      function group_request(buttonId) {
+        var slice_pos = buttonId.lastIndexOf("_");
+        var selectId = buttonId.slice(0,slice_pos);
+        if (selectId == room.sessionId) {
+          room.send("group_swap");
+        } else {
+          console.log(room.sessionId + " has requested to join group with " + selectId);
+          
+          room.send("group_request",{Id: selectId});
+          group_list.push(selectId);
+        }
+      }
+
+      function leave() {
+        window.location.href = "/";
+      }
+    </script>
+  </body>
+</html>

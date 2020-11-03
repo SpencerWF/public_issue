@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+	<h1>Pico-8 Morse Code</h1>
+	<p>Morse Code is a character encode scheme used in telecommunication.  It encodes text into sequences of two different signal durations. "Dots" and "Dashes". More details can be gotten from <a class="title" href="http://www.nu-ware.com/NuCode%20Help/index.html?morse_code_structure_and_timing_.htm">nu-ware.com</a> or <a class="title" href="en.wikipedia.org/wiki/Morse_code">wikipedia</a>. The goal of this is simply to make putting morse code into a Pico-8 game easy to do without resorting to visual representation of an auditory encoding scheme.</p>
+
+	<p>The basis of this asset is the functions <b>dot()</b>, <b>dash()</b>, <b>c_space</b>, and <b>w_space()</b>, and the first sound effect (0)</p>
+
+	<img src="{{url_for('static', filename='morse_sounds.png')}}" alt="Sound Effect" style="width:450px;height:450px;">
+
+	<p>The 32nd note (the pink one) is necessary for the two space functions as without it they won't count as playing a sound, and therefore won't register under "stat(23)".</p>
+
+	<pre>
+		<code>
+function morse_str()
+ for i=1,#message do
+  let=sub(message,i,i)
+
+  if let==" " then
+   w_space()
+   while(stat(23)~=-1) do
+    yield()
+   end
+  else
+   for l_fnc in all(morse_alphabet[let]) do
+    l_fnc()
+    while(stat(23)~=-1) do
+     yield()
+    end
+   end
+   c_space()
+   while(stat(23)~=-1) do
+    yield()
+   end
+  end
+ end
+end
+		</code>
+	</pre>
+
+	<p>The morse alphabet is a table containing a set of dots and dashes appropriate for each letter. The <b>morse_str()</b> function is used to play whatever message is contained in the variable <b>message</b>.  This function is called as a coroutine and passes control back whenever it is waiting for a sound to finish, by this line <b>while(stat(23)~=-1) do</b>.</p>
+
+	<p>To call <b>morse_str()</b> put a string in the global <b>message</b> and then use this line <b>cor = cocreate(morse_str)</b>, with the following code below it. </p>
+
+	<pre>
+		<code>
+if cor and costatus(cor) != 'dead' then
+ coresume(cor)
+else
+ cor=nil
+end
+		</code>
+	</pre>
+
+	<p>Feel free to use this however you please.</p>
+{% endblock %}

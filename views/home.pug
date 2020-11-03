@@ -1,0 +1,106 @@
+head
+  title
+  link(rel='stylesheet' href='styles.css')
+  link(rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css' integrity='sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh' crossorigin='anonymous')
+  script(src='https://code.jquery.com/jquery-3.4.1.slim.min.js' integrity='sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n' crossorigin='anonymous')
+  script(src='https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js' integrity='sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo' crossorigin='anonymous')
+  script(src='https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js' integrity='sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6' crossorigin='anonymous')
+  //- script.
+    document.onkeydown = function(e) {
+      if(event.keyCode == 123) {
+        console.log('You cannot inspect Element');
+        return false;
+      }
+      if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) {
+        console.log('You cannot inspect Element');
+        return false;
+      }
+      if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) {
+        console.log('You cannot inspect Element');
+        return false;
+      }
+      if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) {
+        console.log('You cannot inspect Element');
+        return false;
+      }
+      if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) {
+        console.log('You cannot inspect Element');
+        return false;
+      }
+    }
+    // prevents right clicking
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+nav#navigation.navbar.navbar-expand-lg.navbar-dark.bg-dark
+  a.navbar-brand(href='#') Navbar
+  button.navbar-toggler(type='button' data-toggle='collapse' data-target='#navbarSupportedContent' aria-controls='navbarSupportedContent' aria-expanded='false' aria-label='Toggle navigation')
+    span.navbar-toggler-icon
+  #navbarSupportedContent.collapse.navbar-collapse
+    ul.navbar-nav.mr-auto
+      li.nav-item.active
+        a.nav-link(href='/')
+          | Home 
+          span.sr-only (current)
+      li.nav-item
+        //- - var oneshot_path = #{one_shot}
+        a.nav-link(href='/' + one_shot) One-Shot
+      li.nav-item
+        a.nav-link(href='/' + score_attack) Score-Attack
+      li.nav-item
+        a.nav-link(href='/lobby') Lobby
+      li.nav-item
+        a.nav-link(href='/info') Info
+#carouselExampleCaptions.carousel.slide(data-ride='carousel' data-pause='hover')
+  ol.carousel-indicators
+    li.active(data-target='#carouselExampleCaptions' data-slide-to='0')
+    li(data-target='#carouselExampleCaptions' data-slide-to='1')
+    li(data-target='#carouselExampleCaptions' data-slide-to='2')
+    li(data-target='#carouselExampleCaptions' data-slide-to='3')
+    li(data-target='#carouselExampleCaptions' data-slide-to='4')
+  .carousel-inner.text-center
+    .carousel-item.active(style="background-image: url('intro_slide_background.png');")
+      a(href='/')
+        .d-flex.h-100.align-items-center.justify-content-center
+          .column
+            h1 Welcome to #{location}'s Unseen Arcade. Your name is &quot;Majestic-Guitar&quot;
+            h1 There are ten Unseen Arcades in #{city}.Can you find them all?
+    .carousel-item(style="background-image: url('meta_slide_background.png');")
+      a(href='/one_shot')
+        .d-flex.h-100.align-items-center.justify-content-center
+          .column
+            h1 The current meta-game is #{meta_name}!
+    .carousel-item(style="background-image: url('score_attack_slide_background.png');")
+      a(href='/score_attack')
+        .d-flex.h-100.align-items-center.justify-content-center
+          .column
+            h1
+              | #{winning_city} has the highest score in #{score_attack}.
+            h1
+              | #{city}&apos;s arcade with the highest score is #{winning_location}.
+            if winning_location != location
+                h1 Can you claim victory for #{location}?
+    .carousel-item(style="background-image: url('lobby_slide_background.png');")
+      a(href='/lobby')
+        .d-flex.h-100.align-items-center.justify-content-center
+          .column
+            h1 There are currently {{context[&quot;lobby_count&quot;]}} players waiting for a game.
+            h1
+              | Games will start every #{process.env.LOBBY_DELAY_MINS} minutes.
+    .carousel-item(style="background-image: url('information_slide_background.png');")
+      a(href='/info')
+        .d-flex.h-100.align-items-center.justify-content-center
+          .column
+            h1
+              | Unseen Arcade is a project by a small dedicated team to develop a social gaming console
+              | and network.
+            h1
+              | It has been inspired by a number of previous games, Pokemon Go, Jackbox Party Pack, and
+              | others
+            h1 If you wish to learn more, we are located at unseenarcade.com
+  a.carousel-control-prev(href='#carouselExampleCaptions' role='button' data-slide='prev')
+    span.carousel-control-prev-icon(aria-hidden='true')
+    span.sr-only Previous
+  a.carousel-control-next(href='#carouselExampleCaptions' role='button' data-slide='next')
+    span.carousel-control-next-icon(aria-hidden='true')
+    span.sr-only Next
+script.

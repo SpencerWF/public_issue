@@ -1,0 +1,65 @@
+# base-image for python on any machine using a template variable,
+# see more about dockerfile templates here: https://www.balena.io/docs/learn/develop/dockerfile/
+FROM balenalib/%%BALENA_MACHINE_NAME%%-node:10-stretch-run
+
+LABEL maintainer="Spencer Walker-Fooks <spencer@unseengames.com>"
+
+# use `install_packages` if you need to install dependencies,
+# for instance if you need git, just uncomment the line below.
+# RUN install_packages git
+RUN install_packages dnsmasq wireless-tools wget network-manager
+
+WORKDIR /usr/src
+
+RUN curl https://api.github.com/repos/balena-io/wifi-connect/releases/latest -s \
+    | grep -hoP 'browser_download_url": "\K.*%%RESIN_ARCH%%\.tar\.gz' \
+    | xargs -n1 curl -Ls \
+    | tar -xvz -C /usr/src/
+
+COPY scripts/start.sh ./
+COPY scripts/lobby.timer /etc/systemd/system/lobby.timer
+COPY rooms/ rooms/
+COPY static/ static/
+COPY templates/ templates/
+COPY *.json ./
+COPY config.js ./
+COPY index.ts ./
+COPY views/ views/
+COPY name_mng/ ./name_mng
+COPY dmloader.js ./
+# COPY .env* ./
+
+#Setup cron task to start multiplayer games every 4 minutes
+# RUN echo "*/4 * * * * /usr/src/scripts/lobby.sh" | crontab
+
+# Enable udevd so that plugged dynamic hardware devices show up in our container.
+ENV UDEV=1
+
+ARG NODE_ENV
+ARG PORT
+ARG CITY
+ARG LOCATION
+ARG ONE_SHOT
+ARG SCORE_ATTACK
+ARG WINNING_CITY
+ARG WINNING_LOCATION
+ARG LOBBY_DELAY_MINS
+ARG META_NAME
+ARG PROFILER
+ARG DEBUG
+
+ENV NODE_ENV=${NODE_ENV}
+ENV SCORE_ATTACK=${SCORE_ATTACK}
+ENV ONE_SHOT=${ONE_SHOT}
+ENV CITY=${CITY}
+ENV LOCATION=${LOCATION}
+ENV PORT=${PORT}
+ENV WINNING_CITY=${WINNING_CITY}
+ENV WINNING_LOCATION=${WINNING_LOCATION}
+ENV LOBBY_DELAY_MINS=${LOBBY_DELAY_MINS}
+ENV META_NAME=${META_NAME}
+ENV PROFILER=${PROFILER}
+ENV DEBUG=${DEBUG}
+
+# server.js will run when container starts up on the device
+CMD ["bash", "start.sh"]

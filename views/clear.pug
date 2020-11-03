@@ -1,0 +1,19 @@
+doctype html
+head
+  meta(name='viewport' content='width=device-width')
+  link(rel='stylesheet' href='styles.css')
+  style.
+    body { font-family: Tahoma, Geneva, sans-serif; }
+h1.
+  You have cleared the local storage.
+p.
+p.
+button(onclick='leave()') leave clear storage page
+script.
+  import ls, {get, set, clear} from 'local-storage';
+  var ls;// = require('local-storage');
+  ls.clear();
+
+  function leave() {
+    window.location.href = "/";
+  }

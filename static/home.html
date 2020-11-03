@@ -1,0 +1,133 @@
+<html>
+
+<head>
+
+	<title></title>
+
+	<link rel="stylesheet" href="styles.css">
+
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+		integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+
+	<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
+		integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n"
+		crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+		integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+		crossorigin="anonymous"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+		integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+		crossorigin="anonymous"></script>
+</head>
+
+<body>
+	<nav class="navbar navbar-expand-lg navbar-dark bg-dark" id="navigation">
+		<a class="navbar-brand" href="#">Navbar</a>
+		<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+			aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+
+		<div class="collapse navbar-collapse" id="navbarSupportedContent">
+			<ul class="navbar-nav mr-auto">
+				<li class="nav-item active">
+					<a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="/one_shot">One-Shot</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="/score_attack">Score-Attack</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="/lobby">Lobby</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="/info">Info</a>
+				</li>
+			</ul>
+		</div>
+	</nav>
+
+	<div id="carouselExampleCaptions" class="carousel slide" data-ride="carousel" data-pause="hover">
+		<ol class="carousel-indicators">
+			<li data-target="#carouselExampleCaptions" data-slide-to="0" class="active"></li>
+			<li data-target="#carouselExampleCaptions" data-slide-to="1"></li>
+			<li data-target="#carouselExampleCaptions" data-slide-to="2"></li>
+			<li data-target="#carouselExampleCaptions" data-slide-to="3"></li>
+			<li data-target="#carouselExampleCaptions" data-slide-to="4"></li>
+		</ol>
+		<div class="carousel-inner text-center">
+			<div class="carousel-item active" style="background-image: intro_slide_background.png">
+				<a href="/">
+					<div class="d-flex h-100 align-items-center justify-content-center">
+						<div class="column">
+							<h1>Welcome to {{context["location"]}} Unseen Arcade. Your name is "Majestic-Guitar"</h1>
+							<h1>There are ten Unseen Arcades in {{context["city"]}}.Can you find them all?</h1>
+						</div>
+					</div>
+				</a>
+			</div>
+			<div class="carousel-item" style="background-image: meta_slide_background.png">
+				<a href="/one_shot">
+					<div class="d-flex h-100 align-items-center justify-content-center">
+						<div class="column">
+							<h1>The current meta-game is {{context["meta_name"]}} {{context["meta_challenge"]}}?</h1>
+							<h1>The {{context["meta_piece_type"]}} for this Arcade is {{context["meta_piece_game"]}}.
+								{{context["meta_piece_challenge"]}}</h1>
+						</div>
+					</div>
+				</a>
+			</div>
+			<div class="carousel-item" style="background-image: score_attack_slide_background.png">
+				<a href="/score_attack">
+					<div class="d-flex h-100 align-items-center justify-content-center">
+						<div class="column">
+							<h1>{{context["winning_city"]}} has the highest score in {{context["score_attack_game"]}}.
+							</h1>
+							<h1>{{context["city"]}}'s arcade with the highest score is {{context["winning_location"]}}.
+							</h1>
+							{% if context["winning_city"] != context["city"] %}
+							<h1>Can you claim victory for {{context["location"]}}?</h1>
+							{% endif %}
+						</div>
+					</div>
+				</a>
+			</div>
+			<div class="carousel-item" style="background-image: lobby_slide_background.png">
+				<a href="/lobby">
+					<div class="d-flex h-100 align-items-center justify-content-center">
+						<div class="column">
+							<h1>There are currently {{context["lobby_count"]}} players waiting for a game.</h1>
+							<h1>Games will start every {{context["lobby_time_max"]}} minutes, the next start time is at
+								{{context["current_time"] + context["lobby_time"]}}.</h1>
+						</div>
+					</div>
+				</a>
+			</div>
+			<div class="carousel-item" style="background-image: information_slide_background.png">
+				<a href="/info">
+					<div class="d-flex h-100 align-items-center justify-content-center">
+						<div class="column">
+							<h1>Unseen Arcade is a project by a small dedicated team to develop a social gaming console
+								and network.</h1>
+							<h1>It has been inspired by a number of previous games, Pokemon Go, Jackbox Party Pack, and
+								others</h1>
+							<h1>If you wish to learn more, we are located at unseenarcade.com</h1>
+						</div>
+					</div>
+				</a>
+			</div>
+		</div>
+		<a class="carousel-control-prev" href="#carouselExampleCaptions" role="button" data-slide="prev">
+			<span class="carousel-control-prev-icon" aria-hidden="true"></span>
+			<span class="sr-only">Previous</span>
+		</a>
+		<a class="carousel-control-next" href="#carouselExampleCaptions" role="button" data-slide="next">
+			<span class="carousel-control-next-icon" aria-hidden="true"></span>
+			<span class="sr-only">Next</span>
+		</a>
+	</div>
+</body>
+
+</html>

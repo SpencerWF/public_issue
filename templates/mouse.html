@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block content %}
+	<h1>Pico-8 Mouse Control</h1>
+	<p>This is a basic mouse control setup which can be used for mobile games made in the Pico-8. The indepth information for starting use of the mouse can be gotten from the <a class="title" href="https://pico-8.fandom.com/wiki/Stat#.7B30.E2.80.A636.7D_Mouse_and_keyboard_in_.22devkit_mode.22">Pico-8 Wiki</a>. The basic premise is to get as much of the basic mobile control system easily accessed on the Pico-8.  Thus functionality for <b>clicked</b>, <b>held</b> and <b>swiped</b> exists, however there is no functionality for multi-touch.</p>
+
+	<p>This engine is the basis for control for each of the games I have written for Unseen Games using the Pico-8.</p>
+
+	<p>I have tried to make it relatively efficient for Pico-8 tokens, however, if you can improve it please let me know.</p>
+
+	<p>The use of a mouse is part of the devkit for Pico-8, and this engine has been designed on the assumption that the Entity-Components-Systems setup is in place. Therefore there are four steps needed as soon as you want to be able to use the mouse, with an additional two if you wish to use buttons as well.</p>
+
+	<pre>
+		<code>
+poke(0x5f2d,1)
+entities={}
+		</code>
+	</pre>
+
+	<p>Firstly turn on mouse functionality, using the above poke command.  Then create an entities table, this table will contain a mouse table, as well as anything else you want updated during each loop.</p>
+
+	<pre>
+		<code>
+mouse={
+ state=nil,
+ set_mx=nil,
+ set_my=nil,
+ mx=0,
+ my=0,
+ cur_s=false,
+ swipe_dist=8,
+ swipe_dir=nil,
+}
+
+add(entities,mouse)
+		</code>
+	</pre>
+
+	<p>The mouse table contains all of the information needed for use of the mouse as a controller. The state is assigned in the mouse's <b>update</b> function, and is the next function to be called, the only three attributes of the mouse that you need to worry about directly are the <b>state</b>, the <b>swipe_dist</b> and the <b>swipe_dir</b>. This table must then be added to the entities table.</p>
+
+	<p>The <b>set_mx</b> and <b>set_my</b> attributes are the position of the mouse when it was clicked. This is used to determine which button is clicked or which item is being swiped.</p>
+
+	<p>There are two attributes for the position of the mouse, <b>mx</b> and <b>my</b>, which get updated each time the mouse <b>update</b> function is called, irrespective of the state of the mouse.</p>
+
+	<p>If the mouse is clicked or not is determined by the <b>cur_s</b> attribute, which can either be true or false, but is entirely handled by the mouse <b>update</b> function.</p>
+
+	<p>The next two attributes are used only for swipeing functionality if that is needed. <b>swipe_dist</b> is the number of pico-8 pixels necessary for the mouse to count as being swiped.  I have set this to 8 as that seemed to be reasonable to count as a swipe.  If you want to use an actual drag and drop function then I recommend using the <b>held</b> functionality over the <b>swipe</b> functionality.</p>
+
+	<p>There are 5 functions that the mouse needs to work, <b>update</b>,<b>swiped</b>, <b>held</b>, <b>clicked</b>, and <b>clear</b>. </p>
+
+	<pre>
+		<code>
+for e in all(entities) do
+ e:update()
+ if e.state then
+  e[e.state](e)
+ end
+end
+		</code>
+	</pre>
+
+	<p>During each gameplay loop the <b>_update</b> function will execute, which needs to call the <b>mouse:update</b> function using the above code, which updates each of the entities currently in the entities table (including the mouse). (If the only entity you have is the mouse than feel free to replace "e" with the word "mouse" and remove the line <b>for e in all(entities) do</b>). After each entity is updated it's state is called by <b>e[e.state](e)</b> as a function (this particular line might be confusing and will be explained seperately).</p>
+
+	<p>This line <b>e[e.state](e)</b> occurs for each entity in the entities table which, after updating, requires a function be called for it. Thus the first <b>e</b> refers to the table within entities, in this case <b>mouse</b>. <b>e.state</b> refers to a string that is identical to the name of a function for that table, for example "swiped" is one potential state for the mouse and the name of the function being called.</p>
+
+	<pre>
+		<code>
+function mouse:update()
+ --get mouse position, returning it to the edges of the screen if it goes beyond
+ self.mx=stat(32)
+ if self.mx &lt 0 then self.mx=0
+ elseif self.mx &gt 127 then self.mx=127 end
+ self.my=stat(33)
+ if self.my &lt 0 then self.my=0
+ elseif self.my &gt 127 then self.my=127 end
+
+ --checking that the mouse is clicked, and setting the current state to
+ --true, for clicked, also grabbing the mouse position when first clicked
+ if stat(34)%2==1 then
+  if not self.cur_s then
+   self.set_mx=self.mx
+   self.set_my=self.my
+   self.cur_s=true
+   self.state="held"
+  end
+ else
+ -- if the mouse is not currently pressed but was in the previous update then set
+ -- the mouse to either swiped or clicked depending on the distance the mouse
+ -- was moved while clicked
+
+  if self.cur_s then
+   if abs(self.mx-self.set_mx)&gtself.swipe_dist then
+    self.state="swiped"
+    if self.set_mx&gtself.mx then
+     self.swipe_dir=1
+    else
+     self.swipe_dir=0
+    end
+   elseif abs(self.my-self.set_my)&gtself.swipe_dist then
+    self.state="swiped"
+    if self.set_my&gtself.my then
+     self.swipe_dir=3
+    else
+     self.swipe_dir=2
+    end
+   else
+    self.state="clicked"
+   end
+    self.cur_s=false
+  end
+ end
+end
+		</code>
+	</pre>
+
+	<p>The update code is primarily just to get the current status of the mouse, given the clicked state, the initial click position, the release position and previous state. The pressed or not state of the mouse is extracted from <b>stat(34)%2==1</b>.  If the mouse is pressed but it wasn't last loop (a rising edge) then the mouse position is taken in set_mx and set_my, cur_s is set to true and the state is turned to <b>held</b>. If the mouse is not pressed but it was last loop (a falling edge) then the current mouse position relative to the set position is used to determine if a swipe or a click has occured.  If a swipe has occured than the swipe direction is taken in <b>self.swipe_dir</b> according to the conventions of Pico-8, 0=right, 1=left, 2=up, 3=down.</p>
+
+	<pre>
+		<code>
+function mouse:swiped()
+ -- function to call when the moust is swiped i don't need this as it isn't necessary 
+ -- with the game i am currently working on, however, if you have use of it
+ -- then use the self.swipe_dir attribute to get the direction that the mouse was swiped in.
+ -- 0=right, 1=left, 2=up, 3=down
+end
+		</code>
+	</pre>
+
+	<p>I didn't need a <b>swiped</b> function for the game I am currently developing, however you will want to merely read in the value of <b>self:swipe_dir</b> and use that to determine your reaction to the swipe. This does however assume only the four cardinal directions.  If you are after a rewriting of this to allow for any direction swipe, (such as a game where you are dragging birds on a slingshot to destroy the houses of pigs), feel free to contact me as I would be happy to assist, just haven't got an excuse at the moment.</p>
+	
+	<p></p>
+
+	<pre>
+		<code>
+function mouse:held()
+ for o in all(buttons) do
+  if o.x-1&ltself.mx and self.mx&lto.x+o.size_x*8+1 and
+    o.y-1&ltself.my and self.my&lto.y+o.size_y*8+1 then
+   if o.held then
+    o.held()
+    o.t=1
+   end
+  end
+ end
+end
+		</code>
+	</pre>
+	
+	<p>As you can see from the above code a table called <b>buttons</b> is used, this will need to be filled with buttons for the held or clicked functions as they have been written here. Code for this will be provided below the mouse functionality, however it will largely change depending on your particular setup. The rest of the code is merely to run the appropriate function for the particular button being held down, if there is one.  If the button does not have a held function (o.held is nil) then nothing will happen.</p>
+
+	<pre>
+		<code>
+function mouse:clicked()
+ for o in all(buttons) do
+  if o.x-1&ltself.mx and self.mx&lto.x+o.size_x*8+1 and
+    o.y-1&ltself.my and self.my&lto.y+o.size_y*8+1 then
+   if o.clicked then
+    o.clicked(o.s)
+    o.t=1
+   end
+  end
+ end
+ self:clear()
+end
+		</code>
+	</pre>
+	
+	<p>This function only needs to be called in the event that the mouse was pressed and then released within <b>swipe_dist</b> of the original press location. This does mean that it will always be called after a running of the held function, this can be altered by having a count down of the number of loops that the mouse was held before it counts as <b>held</b> and it cannot change to the <b>clicked</b> state after being in the <b>held</b> state. Similar to the <b>held</b> function the <b>clicked</b> function goes through each button in the <b>buttons</b> table to find the correct button and then call it's corresponding <b>clicked</b> function.</p>
+	
+	<pre>
+		<code>
+function mouse:clear()
+ -- clear the mouse 
+ self.state=nil
+ self.swipe_dir=nil
+ self.set_my=nil
+ self.set_mx=nil
+end
+		</code>
+	</pre>
+	
+	<p>Finally the <b>clear</b> is called to clear the <b>mouse</b> setup and is called at the end of the <b>clicked</b> function.</p>
+	
+	<pre>
+		<code>
+buttons={}
+
+function render_buttons()
+ for b in all(buttons) do
+  if b.t>0 then
+   pal(13,5)
+   b.t-=1
+   spr(b.sp,b.x,b.y,b.size_x,b.size_y)
+   pal()
+  else
+   spr(b.sp,b.x,b.y,b.size_x,b.size_y)
+  end
+  if b.word then
+   print(b.word,b.x+(b.size_x*8/2)-(#b.word*4/2),b.y+2,7)
+  end
+ end
+end
+
+function create_button(_held,_clicked,x,y,sp,sx,sy,_s,_word)
+ b={
+  held=_held,
+  clicked=_clicked,
+  x=x,
+  y=y,
+  sp=sp,
+  size_x=sx,
+  size_y=sy,
+  s=_s or nil,
+  word=_word,
+  t=0
+ }
+
+ add(buttons,b)
+end
+		</code>
+	</pre>
+
+	<p>The final pieces of code needed from my library is button creation and button rendering, although you will need to write appropriate functions for each of your buttons to call in the event they are clicked or held. It is recommended for each button set to call the above function multiple times from another function.  For example I have a <b>menu_buttons</b> function and a <b>game_buttons</b> function for those two game states.</p>
+
+	<p>The <b>create_button</b> function creates a single button with a number of attributes. x and y are the button coordinates, sp is the sprite, and size_x and size_y are the number of sprites in each direction. <b>held</b> and <b>clicked</b> need to be actual functions for each button, for example if you want a player to move left when a button is clicked you might name that function "pl_left" in which case you would send <b>_clicked</b> the name of that function <b>pl_left</b>. S is just used to differentiate different otherwise identical buttons and can almost always be passed as nil. Finally the word attribute is only used if you want a word to be printed in the center of the button.</p>
+
+	<p>For drawing a button 
+
+	<a class="title" href="">Here it is</a>
+{% endblock %}

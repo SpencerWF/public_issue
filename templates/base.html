@@ -1,0 +1,36 @@
+<!-- <html>
+	<head>
+		<link rel="stylesheet" href="{{url_for('static', filename='css/style.css') }}">
+		<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+		{% if title %}
+		<title>{{ title }} - Unseen Arcade </title>
+		{% else %}
+		<title>Welcome to Unseen Arcade </title>
+		{% endif %}
+		{% block head %}{% endblock %}
+	</head> 
+	<body>
+		<div class="margin"></div>
+		<div class="background">
+			<div class="container">
+				<div id="navbar" class="flex-item">
+					Unseen Games: <a href="/index">Home : </a> <a href="/puzzle">Puzzle Game : </a> <a href="/scoreattack">Score Attack : </a> <a href="/multiplayer">Multiplayer : </a> <a href="www.unseengames.com/home">Website</a>
+				</div>
+				<div id=linkbar class="fixed">
+					<a class="nounderline" href="https://twitter.com/unseengames">
+						<img src={{url_for('static', filename='twitter.png')}} alt="Twitter" style="width:32px;height:32px;border:0;">
+					</a>
+					<a class="nounderline" href="https://www.linkedin.com/in/spencer-walker-fooks">
+						<img src={{url_for('static', filename='linkedin.png')}} alt="Linkedin" style="width:32px;height:32px;border:0;">
+					</a>
+					<a class="nounderline" href="https://SpencerWF.github.io">
+						<img src={{url_for('static', filename='resume.png')}} alt="Resume" style="width:32px;height:32px;border:0;">
+					</a>
+				</div>
+			</div>
+			<hr>
+			{% block content %}{% endblock %}
+		</div>
+		<div id="margin"></div>
+	</body>
+</html> -->

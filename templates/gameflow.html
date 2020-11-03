@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+	<h1>Pico-8 Game Flow</h1>
+	<p>This is a very basic gameflow control setup one can use for Pico-8 games. The concept is taken from <a class="title" href="https://pico-8.fandom.com/wiki/Multiple_States_System">Pico-8 Website</a>. The basic premise is to have a "init", "update" and "draw" function for each state the game will go through. Feel free to use any of this, however, leaving a reference to this page would be appreciated.</p>
+
+	<p>In my games, I have 6 different states for the game to go through. Intro, Transition, Menu, Tutorial, Gameplay, and Win.  Each of these has it's own "init", "update" and "draw" functions. A set of global variables are used to maintain the state of the game. Between each state a call of the transiton state occurs, this is to clearly seperate each state, which may or may not be needed in your particular game.</p>
+
+	<p>Finally, it is recommended to use the same control system between each state so as to reduce the amount of tokens used on the cartridge.</p>
+
+	<a class="title" href="">Here it is</a>
+{% endblock %}

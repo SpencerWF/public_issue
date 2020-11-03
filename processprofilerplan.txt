@@ -1,0 +1,9 @@
+process profiler plan:
+Timing on different tasks
+    bash scripts - SECONDS
+
+Application profiler
+    perf command
+
+NodeJs Profiler:
+    V8 Profiler with ab linux command

@@ -1,0 +1,5 @@
+[Unit]
+Description=Run every 4 minutes to start a multiplayer game if enough players are joined
+
+[Timer]
+OnUnitActiveSec=4m
