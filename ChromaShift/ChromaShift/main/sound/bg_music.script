@@ -1,0 +1,35 @@
+local default_gain = 0.75
+function init(self)
+	-- Add initialization code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+	self.music_playing = false
+	self.mute = false
+	self.gain = default_gain
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+end
+
+function update(self, dt)
+	
+	if not self.music_playing and not Util.Tutorial then
+		self.music_playing = true
+		sound.play("/bg_music#bg_music", {gain = self.gain})
+	end
+	
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("mute") then
+		self.mute = not self.mute
+		if self.mute then
+			sound.set_gain("/bg_music#bg_music", 0)
+		else
+			sound.set_gain("/bg_music#bg_music", self.gain)
+		end 
+	end
+end

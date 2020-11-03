@@ -1,0 +1,74 @@
+-- state = true sets gui visible
+-- state = false sets gui invisible
+local function SetVisible(self, visible)
+	local button_colour = gui.get_color(gui.get_node("end"))
+	if visible then
+		self.visible = true
+		button_colour.w = 1
+		gui.set_color(gui.get_node("restart"), button_colour)
+		gui.set_color(gui.get_node("end"), button_colour)
+		gui.set_color(gui.get_node("game_over"), vmath.vector4(1, 1, 1, 1))
+		gui.set_color(gui.get_node("score_text"), vmath.vector4(1, 1, 1, 1))
+	else
+		self.visible = false
+		button_colour.w = 0
+		gui.set_color(gui.get_node("restart"), button_colour)
+		gui.set_color(gui.get_node("end"), button_colour)
+		gui.set_color(gui.get_node("game_over"), vmath.vector4(0, 0, 0, 0))
+		gui.set_color(gui.get_node("score_text"), vmath.vector4(0, 0, 0, 0))
+	end
+	
+end
+
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+	self.visible = false
+	SetVisible(self, false)
+
+	self.timer_running = false
+	self.timer = 0
+	self.timer_max = 0.1
+end
+
+function final(self)
+	msg.post(".", "release_input_focus")
+end
+
+function update(self, dt)
+	if self.timer_running then
+		self.timer = self.timer + dt
+		if self.timer > self.timer_max then
+			self.timer_running = false
+			self.timer = 0
+			msg.post("/player#player", Hash.RESTART)
+		end
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == Hash.GAME_OVER then
+		print("game over gui show")
+		gui.set_text(gui.get_node("score_text"), string.format("You ran %dm", message.score))
+		SetVisible(self, true)
+	end
+end
+
+function on_input(self, action_id, action)
+	if self.visible then
+		if action_id == hash("touch") and action.pressed then
+			if gui.pick_node(gui.get_node("restart"), action.x, action.y) then 
+				print("restart game")
+				SetVisible(self, false)
+				Util.Game_Over = false
+				msg.post("/world_generator#world_generator", Hash.RESTART)	-- needs to happen after game over set false so platforms delete before new ones are spawned
+				--msg.post("/player#player", Hash.RESTART)
+				self.timer_running = true
+			end
+			if gui.pick_node(gui.get_node("end"), action.x, action.y) then 
+				print("ending session")
+				sys.exit(0)
+			end
+		end
+	end
+end

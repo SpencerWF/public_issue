@@ -1,0 +1,312 @@
+Hash = require "main.modules.hash_tables"
+
+
+-- Colyseus Setup
+local Colyseus = require "colyseus.client"
+
+-- CONNECTION VARS
+local server_address = "localhost"
+local server_port = "3553"
+
+-- ROOM VARS
+local client
+local max_clients = 4
+local room
+local delay = 0
+local delay_time = 0
+
+local location_hs = 0
+-- local player_name = "No-Name"
+
+-- Colyseus Setup only needed for html5 build
+local info = sys.get_sys_info()
+local server_location
+if (info.system_name == "HTML5") then
+	-- If this is a HTML5 build use javascript code to read in the server addess details
+	server_location = html5.run("location.protocol.replace('http', 'ws') + '//' + window.document.location.host.replace(/:.*/, '') + (location.port ? ':' + location.port : '');")
+	window.set_dim_mode(window.DIMMING_OFF)
+else
+	-- Build is not a HTML5 build. This server location assumes the server and the clients are on the same device for testing generally.
+	server_location = "ws://" .. server_address .. ":" .. server_port
+end
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+
+	Util.GetPlayerProps().url = msg.url()
+	go.set("#sprite", "tint", vmath.vector4(1,1,1,0))
+	self.tutorial_state = Util.Tutorial
+	self.velocity = vmath.vector3()
+	self.velocityNew = self.velocity
+	self.in_air = true
+	self.can_jump = false
+	self.jump_held = false
+
+	self.colour = vmath.vector4(1,1,1,1)
+	
+	--self.gravity = 346
+	--self.jump_velocity = 300
+	--self.jump_boost = 120
+
+	self.gravity = Util.gravity
+	self.jump_velocity = Util.GetPlayerProps().jumpVel.y
+	self.jump_boost =  Util.GetPlayerProps().jumpAcc.y
+
+	self.start_pos = go.get_position()
+	self.correction = vmath.vector3()			-- correction vector
+
+	self.score = 0
+
+	self.pause = false
+	self.DelayJumpInput = true;
+	self.DelayJumpInputCount = 0;
+	self.playback_rate = go.get("#sprite", "playback_rate")
+
+	self.dead = false
+	self.await_respawn = false
+
+	-- animation
+	self.anim = hash("idle")				-- default anim
+	self.current_anim = self.anim
+
+	-- Colyseus Initialization
+	client = Colyseus.new(server_location, false) -- false: not to connect immediately
+
+	client:join_or_create("chromashift", {}, function(err, room_instance)
+		if (err ~= nil) then
+			print("JOIN ERROR: " .. err)
+			return
+		end
+
+-- 		-- assign room instance to global "room" variable
+-- 
+-- 		room:on_message("location_hs", function(message)
+-- 			print("Location High Score: "..message)
+-- 		end)
+-- 
+-- 		room:on_message("cheat", function(message)
+-- 			print("Cheat Message")
+-- 			score = 0
+-- 		end)
+-- 
+-- 
+-- 		room:on("leave", function()
+-- 			print("left '" .. room.name .. "'")
+-- 		end)
+	end)
+
+	room = room_instance
+
+	-- End of Colyseus Initialization
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Remove this function if not needed
+end
+
+
+local function ApplyGravity(self, dt)
+	if self.in_air then
+		--self.velocityNew.y = self.velocity.y - 9.81*dt 		-- note this is in pixels per second which is why it doesnt look that fast, we could figure out what it is in meters per second by getting the height of our character in pixels and saying hes x meters tall so therefore 1 meter is x pixels
+		self.velocityNew.y = self.velocity.y + self.gravity*dt			-- aprox 35.3 Px/m	346.3px/s
+	end
+end -- ApplyGravity()
+
+local function ApplyJumpBoost(self, dt)
+	if self.jump_held then
+		self.velocityNew.y = self.velocity.y + self.jump_boost*dt			-- aprox 35.3 Px/m	346.3px/s
+	end 
+end  -- ApplyJumpBoost()
+
+
+local function pause(self, set)
+	if self.pause ~= set then
+		self.pause = set
+		if set then
+			-- Get the current value on component "sprite"
+			self.playback_rate = go.get("#sprite", "playback_rate")
+			go.set("#sprite", "playback_rate", 0)	
+			self.DelayJumpInput = true;
+			room:send("paused") --Alert the server that the player has paused the game
+		else
+			go.set("#sprite", "playback_rate", self.playback_rate)
+			room:send("unpaused") --Alert the server that the player has unpaused the game
+		end
+	end
+end
+
+local function Respawn(self)
+	print("respawn")
+	self.velocity.y = -25
+	self.velocityNew = self.velocity
+	self.score = 0
+	go.set("#sprite", "tint", vmath.vector4(1,1,1,1))
+	go.set_position(self.start_pos)
+	self.dead = false
+	Util.GetPlayerProps().dead = false
+	msg.post("/gui#gameplay_gui", "set_score", { score =  math.ceil(self.score)*0.028 })
+	self.await_respawn = false
+end
+
+local function update_animation(self)						-- used to determine what animation is needed
+
+	if self.dead then
+		self.anim = hash("death")
+	-- elseif self.in_air then 
+	-- 	self.anim = hash("jump_start")
+	elseif Util.Tutorial then
+		self.animation = hash("idle")
+	else
+		self.anim = hash("run")
+	end
+
+end -- update_animation(self)
+
+function update(self, dt)
+	-- Add update code here
+	-- Remove this function if not needed
+	client:loop()
+
+	if Util.Pause or Util.Tutorial then 
+		dt = 0
+	end
+
+	if Util.Pause then 
+		pause(self, true)
+	else
+		pause(self, false)
+	end
+
+	if self.tutorial_state and not Util.Tutorial then
+		go.set("#sprite", "tint", vmath.vector4(1,1,1,1))
+		self.velocity = vmath.vector3()
+		self.velocityNew = vmath.vector3()
+	end
+	self.tutorial_state = Util.Tutorial
+
+	ApplyGravity(self, dt)
+	ApplyJumpBoost(self, dt)
+	local deltaPos = dt*(self.velocityNew + self.velocity)/2
+	local pos = go.get_position()
+	pos = pos + deltaPos
+	if not Util.Tutorial then
+		go.set_position(pos)
+		self.velocity = self.velocityNew
+	end
+	--print("velocity = ", self.velocity.y)
+	if	pos.y < -200 and not Util.Game_Over and not self.await_respawn then
+		self.await_respawn = true
+		Util.Game_Over = true
+		msg.post("/gameover_gui#gameover_gui", Hash.GAME_OVER, {score =  math.ceil(self.score)*0.028})
+	end
+	
+	--animation
+	update_animation(self)
+	if self.anim ~= self.current_anim then
+		msg.post("#sprite", "play_animation", { id = self.anim })
+		self.current_anim = self.anim
+	end
+	
+	-- reset correction
+	self.correction = vmath.vector3()
+	self.in_air = true
+	
+	-- score
+	if not Util.Tutorial and not self.dead and not Util.Game_Over then
+		self.score = self.score + Util.GetPlatProps().vel.x*dt
+	end
+	
+	msg.post("/gui#gameplay_gui", "set_score", { score =  math.ceil(self.score)*0.028 })
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == Hash.CONTACT_POINT_RESPONSE and not self.dead then
+		if message.group == Hash.FLOOR then				-- coliision with floor
+			if message.normal.y > 0 and self.velocity.y <=0 then	-- moving down towards floor
+				if self.in_air then
+					self.in_air = false
+					self.can_jump = true
+					--Get the info needed to move out of collision. We might get several contact points back and have to calculate
+					--how to move out of all of them by accumulating a correction vector for this frame:
+					if message.distance > 0 then								-- First, project the accumulated correction onto the penetration vector
+						local proj = vmath.project(self.correction, message.normal * message.distance)
+						if proj < 1 then										-- Only care for projections that does not overshoot.
+							local comp = (message.distance - message.distance * proj) * message.normal
+							go.set_position(go.get_position() + comp)			-- Apply compensation
+							self.correction = self.correction + comp			-- Accumulate correction done
+						end
+					end
+					-- print("message id = ", message_id)
+					-- print("sender = ", sender)
+					-- print("position = ",message.position)						-- world position of the contact point (vector3).
+					-- print("normal = ", message.normal)							-- normal in world space of the contact point, which points from the other object towards the current object (vector3).
+					-- print("relative_velocity = ", message.relative_velocity)	--the relative velocity of the collision object as observed from the other object (vector3).
+					-- print("distance = ", message.distance)						--the penetration distance between the objects – non negative (number).
+					-- print("applied_impulse = ", message.applied_impulse)		--the impulse the contact resulted in (number).
+					-- print("life_time = ", message.life_time)					--(not currently used!) life time of the contact (number).
+					-- print("mass = ", message.mass)								--the mass of the current collision object in kg (number).
+					-- print("other_mass = ", message.other_mass)					--the mass of the other collision object in kg (number).
+					-- print("other_id = ",other_id)								--the id of the instance the collision object is in contact with (hash).
+					-- print("other_position = ", message.other_position)			--the world position of the other collision object (vector3).
+					-- print("group = ", message.group)							--the collision group of the other collision object (hash).
+					self.velocity.y = 0
+					self.velocityNew.y = 0
+					-- local pos = go.get_position()
+					-- pos.y = pos.y + self.gravity/10
+					-- go.set_position(pos)
+					-- self.gravity = -1*self.gravity
+					--self.in_air = true	
+				else
+					self.in_air = false
+				end
+			end 
+		end
+	elseif message_id == Hash.SET_COLOUR and not self.dead then
+		self.colour = message.colour
+		go.set("#sprite", "tint", self.colour)
+		
+	elseif message_id == Hash.TRIGGER_RESPONSE and not self.dead then
+		if message.group == Hash.GATE and message.enter then
+			print("block check")
+			msg.post(message.other_id, Hash.CHECK_COLOUR, {colour = self.colour})
+		end
+	elseif message_id == Hash.BLOCKED and not self.dead then
+		print("blocked: ", message.blocked)
+		if message.blocked then
+			self.dead = true
+			Util.GetPlayerProps().dead = true
+			--When the player dies send a message to the server with the player's score, which is then compared
+			--to the server's prediction of the score, if it is within a beleivable range then it is entered into
+			--a txt file, and then written to the database.
+			room:send("dead", {player_score=score})
+		end
+	elseif message_id == Hash.RESTART then
+		Respawn(self)
+	end
+end
+
+function on_input(self, action_id, action)
+	if self.DelayJumpInput and not Util.Pause and not Util.Tutorial then
+		self.DelayJumpInput = false
+	elseif action_id == Hash.TOUCH and not Util.Pause and not self.dead and not Util.Tutorial then
+		if action.pressed then
+			--print("touch")
+			if self.can_jump then
+				self.can_jump = false
+				self.in_air = true
+				self.jump_held = true
+				self.velocity.y = self.jump_velocity
+				room:send("jumped") --Alert the server that the player has jumped, used as cheat mitigation
+			end
+		elseif action.released and self.jump_held then
+			--print("release")
+			self.jump_held = false
+		end
+	end
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Remove this function if not needed
+end

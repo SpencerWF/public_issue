@@ -1,0 +1,23 @@
+go.property("colour", vmath.vector4(1,1,1,1))
+function init(self)
+	self.velocity = -Util.GetPlatProps().vel.x
+	msg.post("#sprite", "play_animation",{ id = hash("particles") })
+	go.set("#sprite", "tint", self.colour)
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Remove this function if not needed
+end
+
+function update(self, dt)
+	local pos = go.get_position()
+	pos.x = pos.x + dt*self.velocity
+	go.set_position(pos)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == Hash.ANIMATION_DONE then
+		go.delete()
+	end
+end

@@ -1,0 +1,75 @@
+go.property("colour", vmath.vector4(1,1,1,1))
+go.property("index", 0)
+go.property("generator_url", msg.url())
+
+function init(self)
+	-- Add initialization code here
+	-- Remove this function if not needed
+	go.set("#sprite", "tint", self.colour)
+	self.player_enter = false
+	self.blocked = false
+
+	self.timer_running = false
+	self.timer = 0
+	self.timer_max = 0
+	self.particle_count = 0
+end
+
+function final(self)
+	msg.post(self.generator_url, Hash.DELETED, {index = self.index, type = "gate"})
+end
+
+function update(self, dt)
+	if self.player_enter then
+		self.timer_max = 45.6/Util.GetPlatProps().vel.x			-- 200ms at start and gets faster as the game speeds up so it should look good with faster game speed
+		self.timer_running = true
+		self.player_enter = false
+	end
+
+	if self.timer_running then
+		self.timer = self.timer + dt
+		if self.timer > self.timer_max then
+			self.timer = 0
+			if not self.blocked then
+				local pos = go.get_position("/player#player")
+				pos.y = pos.y + 50 - 15*self.particle_count
+				factory.create("/world_generator#sparkles_factory",pos, nil, {colour = self.colour}, 1)
+				pos.y = pos.y - 60 - 15*self.particle_count
+				factory.create("/world_generator#sparkles_factory",pos, nil, {colour = self.colour}, 1)
+				self.particle_count = self.particle_count + 1
+				if self.particle_count < 2 then
+					self.timer_max = 22.8/Util.GetPlatProps().vel.x -- 200ms at start and gets faster as the game speeds up so it should look good with faster game speed
+				else
+					self.timer_running = false
+				end
+			else
+				self.timer_running = false
+			end
+		end
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == Hash.CHECK_COLOUR then	
+		print("check colour")
+		self.blocked = message.colour ~= self.colour
+		print(self.blocked)
+		msg.post(Util.GetPlayerProps("url"), Hash.BLOCKED, {blocked = self.blocked} )
+	end
+	if message_id == Hash.TRIGGER_RESPONSE then
+		if message.group == Hash.PLAYER and message.enter then
+			print("player enter")
+			self.player_enter = true
+		end
+	end
+end
+
+function on_input(self, action_id, action)
+	-- Add input-handling code here
+	-- Remove this function if not needed
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Remove this function if not needed
+end

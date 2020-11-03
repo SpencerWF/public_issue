@@ -1,0 +1,111 @@
+local function SetPart2Visible(self)
+	self.P2_visible = true
+	local jump_node = gui.get_node("jump")
+	local jump_colour = gui.get_color(jump_node)
+	jump_colour.w = 1
+	gui.set_color(jump_node, jump_colour)
+	gui.set_color(gui.get_node("jump_tap_txt"), vmath.vector4(1))
+	gui.set_color(gui.get_node("jump_fall_txt"), vmath.vector4(1))
+end
+
+local function SetPart3Visible(self)
+	self.P3_visible = true
+	local item_node = gui.get_node("platform")
+	local item_colour = gui.get_color(item_node)
+	item_colour.w = 1
+	gui.set_color(item_node, item_colour)
+	gui.set_color(gui.get_node("item_pickup_txt"), vmath.vector4(1))
+	gui.set_color(gui.get_node("item_player_txt"), vmath.vector4(1))
+	gui.set_color(gui.get_node("item_gate_txt"), vmath.vector4(1))
+	gui.set_color(gui.get_node("item_txt"), vmath.vector4(1))
+end
+
+local function Draw_parabola(position, velocity, acceleration, colour, end_y)
+	local pos = position
+	local startPos = pos
+	local endPos = pos
+	local vel = velocity or Util.GetPlatProps().vel
+	local acc = acceleration or Util.GetFallProps().acc
+	local endY = end_y or 0
+
+	local dt = 0
+	repeat 
+		dt = dt + 0.05
+
+		local y = pos.y + vel.y*dt + (1/2)*acc.y*dt*dt
+		--vel.y = vel.y - acc.y*dt
+
+		local x = pos.x + vel.x*dt + (1/2)*acc.x*dt*dt
+		--vel.x = vel.x - acc.x*dt
+
+		endPos = vmath.vector3(x,y,pos.z)
+		--print("start = ", startPos, " end pos = ", endPos)
+		msg.post("@render:", "draw_line", { start_point = startPos, end_point = endPos, color = colour } )
+		startPos = endPos
+	until endPos.y < endY
+	return endPos
+end
+
+
+function init(self)
+	-- Add initialization code here
+	-- Remove this function if not needed
+	msg.post(".", "acquire_input_focus")
+
+	self.P1_visible = true
+	self.P2_visible = false
+	self.P3_visible = false
+	self.start_count = 0
+	local version = gui.get_node("version")
+	gui.set_text(version, Util.VERSION)
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Remove this function if not needed
+	msg.post(".", "release_input_focus")
+end
+
+function update(self, dt)
+	if self.P2_visible then
+		Draw_parabola(vmath.vector3(250,335,0), Util.GetPlatProps().vel + Util.GetJumpProps().vel, Util.GetJumpProps().acc, vmath.vector4(1,0,0,0.5), 250)
+		Draw_parabola(vmath.vector3(334,335,0), Util.GetPlatProps().vel, Util.GetFallProps().acc, vmath.vector4(0,1,0,0.5), 250)
+		Draw_parabola(vmath.vector3(504,239,0), Util.GetPlatProps().vel + Util.GetJumpProps().vel, Util.GetJumpProps().acc, vmath.vector4(0,1,0,0.5), 250)
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	-- Add message-handling code here
+	-- Remove this function if not needed
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("touch") and action.pressed then
+		local button = gui.get_node("start")
+		if gui.pick_node(button, action.x, action.y) and Util.Tutorial then
+			self.start_count = self.start_count + 1
+			if self.start_count == 1 then
+				gui.delete_node(gui.get_node("you"))
+				SetPart2Visible(self)
+			elseif self.start_count == 2 then
+				-- delete last display
+				gui.delete_node(gui.get_node("jump"))
+				self.P2_visible = false
+				-- reveal new display
+				SetPart3Visible(self)
+				
+				-- set button text to "START"
+				gui.set_text(gui.get_node("start_text"), "START")
+			elseif self.start_count > 2 then
+				print("start game")
+				Util.Tutorial = false
+				msg.post("/tutorial_gui#gui_deleter", Hash.GUI_DELETE)
+			end
+		end
+	end
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Remove this function if not needed
+end

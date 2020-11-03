@@ -1,0 +1,664 @@
+Util = require "main.modules.utility"
+
+
+-- size [number] required: the length of the platform in pixels
+-- position [vector3] optional: the spawn position (if nill will be created at the location of the factory)
+-- rotation[vector3] optional: the rotation of the platform about the origin NOT IMPLEMENTED PROPERLY YET
+-- properties[{}] optional: properties to pass to the created object
+function CreatePlatform( --[[required]]size, --[[optional]]position, --[[optional]]rotation, --[[optional]]properties)
+	local rotation = rotation or nil
+	local properties = properties or nil
+	local pos = vmath.vector3(position) or go.get_position()
+	local big = math.floor(size/100)
+	local small = math.floor((size % 100)/10)
+	local count = 0
+	print("platform created with ", big, " big platforms and ", small, "small platforms")
+	print("x start = ",pos.x)
+	for i = 1, big do
+		count = count + 1
+		properties.last = false
+		if count == big + small then
+			properties.last = true
+			properties.size = 1
+		end
+		factory.create("#platform_factory",pos, rotation, properties)
+		pos.x = pos.x + 100
+		--print("x start = ",pos.x)
+	end
+	for i = 1, small do
+		--factory.create("#platform_factory",pos, rotation, properties, vmath.vector3(0.1,1,1))
+		count = count + 1
+		properties.last = false
+		if count == big + small then
+			properties.last = true
+			properties.size = 2
+		end
+		factory.create("#platform_small_factory",pos, rotation, properties)
+		pos.x = pos.x + 10
+		--print("x start = ",pos.x)
+	end
+	print("x end = ",pos.x)
+
+	--factory.create("#platform_factory",pos, nil, nil, vmath.vector3(8,1,1))
+end
+
+
+function CreatePlatformWithItem(self, index, --[[optional]]size, --[[optional]]position, --[[optional]]rotation, --[[optional]]properties, --[[optional]]item)
+	local rotation = rotation or nil
+	local properties = properties or nil
+	local size = size or self.path[index].plat.length
+	local pos 
+	if position == nil then 
+		pos = vmath.vector3(self.path[index].plat.position)
+	else
+		pos = vmath.vector3(position) 
+	end
+	local item = item or Util.NONE
+	local big = math.floor(size/100)
+	local small = math.floor((size % 100)/10)
+	local count = 0
+	local plat_id
+	local item_id
+
+	local itemTxt = "none"
+
+	if size < Util.MinSpawnThresh then
+		-- dont spawn object
+		item = Util.NONE
+	end
+	
+	if item ~= Util.NONE then
+
+		-- find middle large platform
+		local item_pos = vmath.vector3(pos)
+		item_pos.x = item_pos.x + size/2	-- get x position of the middle
+		item_pos.y = item_pos.y + Util.GetPlatProps("thickness")
+		--print("item position: ",item_pos)
+		
+		if item == Util.PICKUP then
+			-- spawn pickup
+			item_id = factory.create("#pickup_factory",item_pos, rotation, {colour = self.path[index].pickup.colour, index = index, generator_url = self.url}, 3)
+			self.path[index].pickup.spawned = true
+			self.path[index].pickup.spawn = false
+			self.path[index].gate.can_spawn = true
+			itemTxt = "pickup"
+		elseif item == Util.GATE then
+			-- spawn gate
+			item_id = factory.create("#gate_factory",item_pos, rotation, {colour = self.path[index].gate.colour, index = index, generator_url = self.url}, 2)
+			self.path[index].gate.spawned = true
+			self.path[index].gate.spawn = false
+			itemTxt = "gate"
+		end
+	else
+		-- spawn just the platform
+	end
+		
+	print("path index: ", index, " platform created with ", big, " big platforms and ", small, "small platforms, with item: ", itemTxt, " created at: ", pos)
+	--print("x start = ",pos.x)
+	for i = 1, big do
+		count = count + 1
+		properties.last = false
+		if count == big + small then
+			properties.last = true
+			properties.size = 1
+		end
+		if item ~= Util.NONE and i == 1 then
+			properties.has_child = true
+		end 
+		
+		plat_id = factory.create("#platform_factory",pos, rotation, properties)
+		
+		if item ~= Util.NONE and i == 1 then
+			-- attach item to platform
+			msg.post(item_id, "set_parent", { parent_id = plat_id, keep_world_transform = 1 })
+			--print("item plat position: ",pos)
+		end
+		pos.x = pos.x + 100
+		--print("x start = ",pos.x)
+	end
+	for i = 1, small do
+		--factory.create("#platform_factory",pos, rotation, properties, vmath.vector3(0.1,1,1))
+		count = count + 1
+		properties.last = false
+		if count == big + small then
+			properties.last = true
+			properties.size = 2
+		end
+		factory.create("#platform_small_factory",pos, rotation, properties)
+		pos.x = pos.x + 10
+		--print("x start = ",pos.x)
+	end
+	--print("x end = ",pos.x)
+end
+
+local function ConvertDelta_XToTimeDelay(Delta_X, velocity, acceleration)
+	local timeDelay = 0
+	-- t = (-Vo + sqrt(Vo^2 + 2a4DX))/a
+
+	if	acceleration ~= 0 then
+		local inner  = math.pow(velocity, 2) - 2*acceleration*Delta_X		
+		if inner >= 0 then
+			local sqrt = math.sqrt(inner)
+			if	sqrt < 0 then
+				print("X_Delay needs to happen in the past")
+			end
+			timeDelay = (-velocity - sqrt)/acceleration
+		else
+			error("cannot convert delta x to time, sqrt would return an imaginary numner")
+		end
+	else
+		--error("cannot convert delta x to time, acceleration cannot be negative")
+		--print("acceleration is 0 therefore using acceleration independant formula")
+
+		if vellocity ~= 0 then
+			timeDelay = Delta_X/velocity
+		else 
+			error("cannot convert delta x to time, velocity and acceleration cannot be 0 I.E. no motion")
+		end
+	end
+	return timeDelay
+end
+
+local function MaxTimeBetweenPlatforms(pos_y, velocity, acceleration)
+	return ConvertDelta_XToTimeDelay(pos_y, velocity, acceleration)
+end
+
+-- properties = { 
+-- pos = vmath.vector3(x,y,z)
+-- jump = {
+--		vel = vmath.vector3()
+--		acc = vmath.vector3()
+--		}	
+-- fall = {
+--		vel = vmath.vector3()
+--		acc = vmath.vector3()
+--		}	
+-- plat = {
+--		length = [number]
+--		vel = [number]
+--		acc = [number]
+--		}	
+--}
+local function GetTimeIntervals(properties)
+	local p = properties
+	local ret = {tm1, tm2, tM1, tM2, tEnd}
+	local platTime = ConvertDelta_XToTimeDelay(p.plat.length, p.plat.vel, p.plat.acc)
+
+	-- min	
+
+	-- tm1 is the rightmost edge of the platform
+	ret.tm1 = platTime
+	-- tm2 when fall parabola y = 0 + plat thickness (so 4)
+	ret.tm2 = ret.tm1 + ConvertDelta_XToTimeDelay(p.pos.y - p.plat.thickness, p.fall.vel.y, p.fall.acc.y)
+
+	-- max
+	-- tM1 rise time of the jump parabola
+	ret.tM1 = -p.jump.vel.y/p.jump.acc.y
+	-- tM2 peak of the rightmost jump parabola
+	ret.tM2 = ret.tM1 + platTime
+	-- tEnd when the superposition of the jump and fall parabola cross y = 0 + plat thickness
+	--ret.tEnd = ret.tM2 + math.sqrt( (2*(p.pos.y - p.plat.thickness) + math.pow(p.jump.vel.y, 2)/p.jump.acc.y)/(p.fall.acc.y - p.jump.acc.y) )
+	ret.tEnd = ret.tM2 + math.sqrt( (-2*(p.pos.y - p.plat.thickness) + (math.pow(p.jump.vel.y, 2)/p.jump.acc.y))/(p.fall.acc.y - p.jump.acc.y) )
+
+	--print("min time 1 = ", ret.tm1, " min time 2 = ", ret.tm2, " max time 1 = ", ret.tM1, " max time 2 = ", ret.tM2, " end time = ", ret.tEnd)
+	return ret
+end
+
+
+local function CalcPlatY(timeDelay, intervals, timeProps)
+	local yMax = Screen_Height
+	local yMin = timeProps.plat.thickness
+
+	local td = timeDelay
+	-- max
+	if timeDelay < intervals.tM1 then
+		yMax = timeProps.pos.y + timeProps.jump.vel.y*timeDelay + 0.5*timeProps.jump.acc.y * timeDelay * timeDelay
+	elseif timeDelay < intervals.tM2 then 
+		yMax = timeProps.pos.y - 0.5*timeProps.jump.vel.y*timeProps.jump.vel.y/timeProps.jump.acc.y
+	else -- less than tEnd
+		td = timeDelay - intervals.tM2
+		yMax = timeProps.pos.y - 0.5*timeProps.jump.vel.y*timeProps.jump.vel.y/timeProps.jump.acc.y + 0.5 * (timeProps.fall.acc.y - timeProps.jump.acc.y) * td *td
+	end
+
+	if yMax > Util.GetMaxYLimit() then
+		yMax = Util.GetMaxYLimit()
+	end
+	
+	-- min
+	if timeDelay < intervals.tm1 then
+		yMin = timeProps.pos.y
+		--print("min1")
+	elseif timeDelay < intervals.tm2 then
+		td = timeDelay - intervals.tm1
+		yMin = timeProps.pos.y + timeProps.fall.vel.y*td + 0.5*timeProps.fall.acc.y * td * td
+		--print("min2")
+	else -- less than end
+		yMin = timeProps.plat.thickness
+		--print("min3")
+	end
+	
+	
+	--print("ymin:",yMin," ymax:",yMax)
+	local props =
+	{
+		yPos = math.random(yMin, yMax),
+		ymin = yMin,
+		ymax = yMax
+	}
+	
+	return props
+	
+end
+
+
+function CalcNewPlatLength(tM1, delay)
+	local extraDelay = 50/(1+ (delay-tM1)*10)
+	return math.random(Util.GetPlatProps("minLen") + extraDelay, Util.GetPlatProps("maxLen"))
+end
+
+--previousPlat = { 
+	--length = number,
+	--position = vmath.vector3(),
+	--vel = number,
+	--acc = number,
+	--tDelay = number
+	--}
+local function CalcPlatPositionAndDelay(previousPlat)
+	local newPlat = previousPlat
+	newPlat.tDelay = 0
+	newPlat.timer = 0
+	
+	local timeProps = {
+		pos = previousPlat.position,
+		jump = {
+			vel = Util.GetPlatProps().vel + Util.GetJumpProps().vel,
+			acc = Util.GetJumpProps().acc
+		},	
+		fall = {
+			vel = Util.GetPlatProps().vel,
+			acc = Util.GetFallProps().acc
+		},
+		plat = {
+			length = previousPlat.length,
+			thickness = 4,
+			vel = previousPlat.vel,
+			acc = previousPlat.acc
+		}	
+	}
+	local timeIntervals = GetTimeIntervals(timeProps)
+	--newPlat.tDelay = math.random(timeIntervals.tM1*100, timeIntervals.tEnd*100)/100 -- do it like this because math.random uses ints
+	--newPlat.tDelay = Util.RandomFloat(0, timeIntervals.tEnd)
+	newPlat.tDelay = Util.RandomFloat(timeIntervals.tm1, timeIntervals.tEnd)
+	--print("new delay = ", newPlat.tDelay)
+	
+	-- calc y position
+	local Yprops = CalcPlatY(newPlat.tDelay, timeIntervals, timeProps)
+	newPlat.position.y = Yprops.yPos
+	--print("new y = ", newPlat.position.y)
+	newPlat.length = CalcNewPlatLength(timeIntervals.tm1, newPlat.tDelay)
+	newPlat.plat_delay = ConvertDelta_XToTimeDelay(newPlat.length, Util.GetPlatProps().vel.x, Util.GetPlatProps().acc.x)
+	local ret = 
+	{
+		newPlat = newPlat,
+		Yprops = Yprops
+	}
+	return ret
+end 
+
+-- cahnge y position
+local function Change_Y_Position(self, index, Yprops)
+	-- test above -- check if this position is possible for the new platform
+	local new_Y_min = self.path[self.immovable].plat.position.y + 60*2 + 4*2
+	local new_Y_max = self.path[self.immovable].plat.position.y - 60*2 - 4*2
+	if new_Y_min <= Yprops.ymax then
+		-- generate new y position 
+		self.path[index].plat.position.y = math.random(new_Y_min, Yprops.ymax)
+		print("fixed by raising")
+		return true
+		-- test bellow
+	elseif new_Y_max >= Yprops.ymin then
+		self.path[index].plat.position.y = math.random(Yprops.ymin, new_Y_max)
+		print("fixed by lowering")
+		return true
+	else
+		-- see if there is tDelay that would allow a new y value
+		print("cant fix")
+		return true
+	end
+end
+
+local function DetectBadPlatform(self, index, newPlat)
+	-- potential bad if the end of the new plat is after the start of the immovableable
+	-- or if the start of the new plat is before the end of the immovable
+	-- if the start of the new is after the end of the immovable, it becomes the new immovable
+	local immovable = 
+	{
+		plat_delay = self.path[self.immovable].plat.plat_delay,
+		tDelay =  self.path[self.immovable].plat.tDelay,
+		end_delay = self.path[self.immovable].plat.plat_delay + self.path[self.immovable].plat.tDelay,
+		timer = self.path[self.immovable].timer,
+	}
+	local new_start = newPlat.tDelay + immovable.timer														-- platform start relative to the immovable
+	local new_end = newPlat.plat_delay + newPlat.tDelay + immovable.timer									-- platform end relative to the immovable
+	
+	print(immovable.tDelay, immovable.plat_delay, immovable.plat_delay + immovable.tDelay, immovable.timer)	
+	print(newPlat.tDelay, newPlat.plat_delay, newPlat.plat_delay + newPlat.tDelay)
+
+	if (immovable.plat_delay == newPlat.plat_delay and immovable.tDelay == newPlat.tDelay) or (new_start > (immovable.tDelay + immovable.plat_delay)) then
+		print("new immovable index:", index)
+		self.immovable = index
+		return false
+	elseif new_end < immovable.tDelay then
+		print("platform is good")
+		return false
+	else
+		print("time overlap")
+		local deltaY = math.abs(self.path[self.immovable].plat.position.y - newPlat.position.y)
+		print("deltaY:", deltaY)
+		if deltaY > 60*2 + 4*2 then
+			print("platform is good, deltaY is sufficient to prevent interference")
+			return false
+		else
+			print("bad platform")
+			if new_start < immovable.tDelay and new_end < immovable.end_delay then
+				print("overlaps start of immovable")
+			elseif new_start > immovable.tDelay and new_start < immovable.end_delay and new_end > immovable.end_delay then
+				print("overlaps end of immovable")
+			elseif new_start > immovable.tDelay and new_end < immovable.end_delay then
+				print("overlaps middle of immovable")
+			else
+				print("overlaps all of immovable")
+			end
+			return true
+		end
+	end
+end
+
+-- there are 3 ways to fix a bad platform, change its length, change its y position or change its spawn time delay
+
+-- used when the platform is overlapping the start of the immovable
+-- shorten platform, while a simple solution it doesnt help the level design much by itself so its probably a good idea to shorten the delay too
+local function ShortenPlatform(self, timeIntervals, tDelay)
+	-- check how much room we have to move the time dealy
+	local tmin
+	if timeDelay < 1 then
+
+	end
+	
+end
+
+------------------------------------------------------------------
+local function ColourTest()
+	for i = 1, Util.GetColour("count") do
+		print(Util.GetColour()[i])
+		factory.create("#pickup_factory",vmath.vector3(100*i,100,1), nil, {colour = Util.GetColour()[i], index = 0, generator_url = self.url}, 3)
+	end
+end
+
+local function GetRandomColour(previousColour)
+	local colour = previousColour
+	while colour == previousColour do
+		colour = Util.GetColour()[math.random(1, Util.GetColour("count"))]
+	end
+	return colour
+end
+
+local function StartSpawningPickup(self, index)
+	if self.path[index].pickup.can_spawn then
+		return true
+	else
+		local pickup_flag = not self.path[index].pickup.spawn and not self.path[index].pickup.spawned
+		local gate_flag = not self.path[index].gate.can_spawn and not self.path[index].gate.spawn and not self.path[index].gate.spawned
+		if pickup_flag and gate_flag then
+			self.path[index].pickup.can_spawn = true
+			return true
+		else 
+			self.path[index].pickup.can_spawn = false
+			return false
+		end
+	end
+end
+
+local function StartSpawningGate(self, index)
+	if self.path[index].gate.can_spawn then
+		return true
+	else
+		local pickup_flag = self.path[index].pickup.spawned
+		local gate_flag = not self.path[index].gate.spawn and not self.path[index].gate.spawned
+		if pickup_flag and gate_flag then
+			self.path[index].gate.can_spawn = true
+			return true
+		else 
+			self.path[index].gate.can_spawn = false
+			return false
+		end
+	end
+end
+
+local MAX_SPAWN_CHANCE = {
+	pickup = 1000,
+	gate = 5000
+}
+local SPAWN_THRESH = {
+	pickup = 10,
+	gate = 10
+}
+local function CheckSpawnChance(self, index, type, skip)
+	-- gets a random number between 1 and maximum, any number under the spawn threshold will spawn the item
+	-- if the number is between the spawn threshold and the maximum then it will become the maximum for the next itteration
+	if skip then
+		return false
+	end
+	local val = math.random(1, self.path[index][type].spawn_counter)
+	print("index: ", index, ", spawn: ", type, ", val: ", val)
+	if val > SPAWN_THRESH[type] then
+		self.path[index][type].spawn_counter = val
+		return false
+	else
+		-- set spawn flag	
+		print("start spawn ",type)
+		self.path[index][type].can_spawn = false
+		self.path[index][type].spawn_counter = MAX_SPAWN_CHANCE[type]
+		self.path[index][type].spawn = true
+
+		if type == "pickup" then
+			self.path[index].pickup.colour = GetRandomColour(self.path[index].pickup.colour)
+			self.path[index].gate.colour = self.path[index].pickup.colour
+		end
+		return true
+	end
+end
+
+local function SpeedUp()
+	Util.GetPlatProps("vel").x = Util.GetPlatProps("vel").x + 1
+end
+
+local function SetupPaths(self)
+	self.numberOfPaths = 2
+
+	self.path = 
+	{
+		{ 
+			timer = 0,
+			plat = {
+				tDelay = self.timer_max,		-- time till the platform spawns
+				length = 335, 
+				plat_delay = ConvertDelta_XToTimeDelay(335, Util.GetPlatProps().vel.x, Util.GetPlatProps().acc.x), -- time it takes to cross the platform
+				position = vmath.vector3(1280, 100, 0),
+				vel = Util.GetPlatProps().vel.x,
+				acc = Util.GetPlatProps().acc.x
+			},
+			spawn_skip = false,
+			pickup = {
+				spawn = false,
+				spawned = false,
+				can_spawn = true,
+				spawn_counter = MAX_SPAWN_CHANCE.pickup,
+				colour = vmath.vector4(1,1,0,1)
+			},
+			gate = {
+				spawn = false,
+				spawned = false,
+				can_spawn = false,
+				spawn_counter = MAX_SPAWN_CHANCE.gate,
+				colour = vmath.vector4(1,1,0,1)
+			}
+		},
+		{
+			timer = 0,
+			plat = {
+				tDelay = self.timer_max + 10,
+				length = 135,
+				plat_delay = ConvertDelta_XToTimeDelay(135, Util.GetPlatProps().vel.x, Util.GetPlatProps().acc.x),
+				position = vmath.vector3(1280, 300, 0),
+				vel = Util.GetPlatProps().vel.x,
+				acc = Util.GetPlatProps().acc.x
+			},
+			spawn_skip = false,
+			pickup = {
+				spawn = false,
+				spawned = false,
+				can_spawn = true,
+				spawn_counter = MAX_SPAWN_CHANCE.pickup,
+				colour = vmath.vector4(1,0,0,1)
+			},
+			gate = {
+				spawn = false,
+				spawned = false,
+				can_spawn = false,
+				spawn_counter = MAX_SPAWN_CHANCE.gate,
+				colour = vmath.vector4(1,0,0,1)
+			}
+		}
+	}
+	self.immovable = 1	-- index of the current platform that is considered immovable, which is just the platform that currently has the 
+	-- longest time delay before spawning, we use this platform because longer time delay platforms usually have less 
+	-- room to change compared to short delay ones
+end
+
+local function SpawnStarterPlatforms(self)
+	self.speed = Util.GetPlatProps().vel.x
+	self.timer = 0
+	self.timer_max = (250+835)/self.speed
+
+	CreatePlatform(835, vmath.vector3(100,100,0), nil, {speed = self.speed})
+	CreatePlatform(835, vmath.vector3(1280, 100, 0), nil, {speed = self.speed})
+
+	print("timer max ",self.timer_max)
+	local platTime = ConvertDelta_XToTimeDelay(835, self.speed, 0)
+	print("plat timer max ", platTime)
+	self.timer_max = MaxTimeBetweenPlatforms(335, self.speed, 0) + platTime	-- delay the next plaform
+end
+
+
+local Player_pos_x = 459
+
+function init(self)
+	--profiler.enable_ui(true)
+	
+	math.randomseed(os.time())
+	self.tutorial_state = Util.Tutorial
+	
+	local pos = go.get_position()
+	self.screenWidth = Screen_Width			-- not really needed now that the width and height are global
+	self.screenHeight = Screen_Height
+	print("width:",self.screenWidth," Height:", self.screenHeight)
+
+	self.url = msg.url()
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Remove this function if not needed
+end
+
+
+
+function update(self, dt)
+	
+	if Util.Pause or Util.GetPlayerProps().dead or Util.Tutorial or Util.Game_Over then 
+		dt = 0
+	end
+
+	-- if the tutorial has just ended then setup the initial platforms
+	if self.tutorial_state and not Util.Tutorial then
+		SpawnStarterPlatforms(self)
+		SetupPaths(self)
+
+		print("first set: ", self.path[1].plat.position)
+	end
+	self.tutorial_state = Util.Tutorial
+
+	if not Util.Tutorial then
+		-- spawn platforms
+		for i = 1, self.numberOfPaths do
+			self.path[i].timer = self.path[i].timer + dt
+			if self.path[i].timer > self.path[i].plat.tDelay then
+				self.path[i].timer = 0						-- not actually needed since creating a new plat resets the timer anyway
+				
+				-- pickup
+				if StartSpawningPickup(self, i) then
+					CheckSpawnChance(self, i, "pickup", self.path[i].skip)
+				end
+
+				-- gate
+				if StartSpawningGate(self, i) then
+					CheckSpawnChance(self, i, "gate", self.path[i].skip)
+				end
+
+				self.path[i].spawn_skip = false
+				
+				-- platform
+				local item = Util.NONE
+				if self.path[i].pickup.spawn then
+					item = Util.PICKUP
+				elseif self.path[i].gate.spawn then 
+					item = Util.GATE
+				end
+				CreatePlatformWithItem(self, i, nil, nil, nil, {speed = Util.GetPlatProps("vel").x}, item)
+				-- calculate the next platform
+				local PlatProps = CalcPlatPositionAndDelay(self.path[i].plat)
+				-- check if this platform is in a bad spot .... this could all be optomised a little by doing these checks and fixes as the platform is calculated
+				if DetectBadPlatform(self, i, PlatProps.newPlat) then
+					-- if bad plat fix it
+					if not Change_Y_Position(self, i, PlatProps.Yprops) then
+						-- prevent the bad platoform and imovable from spawning an item
+						self.path[i].spawn_skip = true
+						self.path[self.immovable].spawn_skip = true
+					end
+					--DetectBadPlatform(self, i, PlatProps.newPlat)		-- check again because the adjusted platform could now be the next immovable platform
+				end	
+				
+				
+				-- set the new platform for next spawn
+				self.path[i].plat = PlatProps.newPlat
+
+				if i == self.numberOfPaths then -- speed up after the last platform has spawned this cycle
+					SpeedUp()
+				end
+			end
+		end
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	-- message that an item has been deleted, freeing it up to spawn again
+	if message_id == Hash.DELETED then
+		self.path[message.index][message.type].spawned = false
+	end
+	if message_id == Hash.RESTART then
+		Util.ResetSpeed()
+		SpawnStarterPlatforms(self)
+		SetupPaths(self)
+	end
+end
+
+function on_input(self, action_id, action)
+	-- Add input-handling code here
+	-- Remove this function if not needed
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Remove this function if not needed
+end

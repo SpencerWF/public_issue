@@ -1,0 +1,22 @@
+function init(self)
+	print("heartbeat started")
+	self.count = 0
+	self.beat = 10
+end
+
+function final(self)
+	print("heartbeat ended")
+end
+
+function update(self, dt)
+	self.count = self.count + dt
+	if self.count >= self.beat then
+		self.count = 0
+		print("heartbeat")
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	-- Add message-handling code here
+	-- Remove this function if not needed
+end
